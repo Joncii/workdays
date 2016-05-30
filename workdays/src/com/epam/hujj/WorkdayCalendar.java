@@ -5,9 +5,12 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
+import com.epam.hujj.dateinterpreters.ExtraVacationInterpreter;
+import com.epam.hujj.dateinterpreters.ExtraWorkdayInterpreter;
 import com.epam.hujj.dateinterpreters.VacationInterpreter;
 
 public class WorkdayCalendar {
@@ -25,8 +28,6 @@ public class WorkdayCalendar {
 
 	private LocalDate lastDayOfYear;
 
-	private List<LocalDate> totalDays;
-
 	private List<LocalDate> extraWorkdays;
 
 	private List<LocalDate> extraVacationdays;
@@ -35,60 +36,86 @@ public class WorkdayCalendar {
 
 	private List<LocalDate> vacationDays;
 
+	private List<LocalDate> workdays;
+
 	public WorkdayCalendar(int year) {
-		this.extraVacationdays = new ArrayList<LocalDate>();
-		this.extraWorkdays = new ArrayList<LocalDate>();
 		this.standardWorkdays = new ArrayList<LocalDate>();
-		this.totalDays = new ArrayList<LocalDate>();
-		this.vacationDays = new ArrayList<LocalDate>();
 		this.year = year;
-		this.firstDayOfYear = LocalDate.parse(year + "-01-01");
-		this.lastDayOfYear = LocalDate.parse(year + "-12-31");
+		this.firstDayOfYear = LocalDate.parse(this.year + "-01-01");
+		this.lastDayOfYear = LocalDate.parse(this.year + "-12-31");
 
 		try {
 			workdayProperties = Utils.createProperties(WORKDAYS_PATH);
+			
+			VacationInterpreter vacInt = new VacationInterpreter(year + "");
+			vacInt.readFromProperties(workdayProperties);
+			vacationDays = vacInt.getDates();
+			
+			ExtraVacationInterpreter extraVacInt = new ExtraVacationInterpreter();
+			extraVacInt.readFromProperties(workdayProperties);
+			extraVacationdays = extraVacInt.getDates();
+			
+			ExtraWorkdayInterpreter extraWorkInt = new ExtraWorkdayInterpreter();
+			extraWorkInt.readFromProperties(workdayProperties);
+			extraWorkdays = extraWorkInt.getDates();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		populateAllDaysInYear();
 		populateStandardWorkdays();
-		substractVacationDays();
+		removeVacationDays();
+		removeExtraVacationDays();
+		addExtraWorkday();
+		Collections.sort(workdays);
+		
 	}
 
-	private void populateAllDaysInYear() {
-
-		LocalDate temp = firstDayOfYear;
-		while (!temp.isAfter(lastDayOfYear)) {
-			totalDays.add(temp);
-			temp = temp.plusDays(1);
-		}
-
-	}
-
-	private void populateStandardWorkdays() {
-		for (LocalDate day : totalDays) {
-			DayOfWeek dayOfWeek = day.getDayOfWeek();
-			if (validWorkdays.contains(dayOfWeek)) {
-				standardWorkdays.add(day);
+	private void addExtraWorkday() {
+		for(LocalDate date : extraWorkdays){
+			if(!workdays.contains(date)){
+				workdays.add(date);
 			}
 		}
 	}
 
-	private void substractVacationDays() {
-		if (workdayProperties != null) {
-			VacationInterpreter vacInt = new VacationInterpreter(year + "");
-			vacInt.readFromProperties(workdayProperties);
-			vacationDays = vacInt.getDates();
+	private void removeExtraVacationDays() {
+		List<LocalDate> temp = new ArrayList<LocalDate>();
+		temp.addAll(workdays);
+		for(LocalDate date : workdays){
+			if(extraVacationdays.contains(date)){
+				temp.remove(date);
+			}
 		}
+		workdays = temp;
 	}
 
-	public List<LocalDate> getTotalDays() {
-		return this.totalDays;
+	private void removeVacationDays() {
+		List<LocalDate> temp = new ArrayList<LocalDate>();
+		temp.addAll(standardWorkdays);
+		for(LocalDate date : standardWorkdays){
+			if(vacationDays.contains(date)){
+				temp.remove(date);
+			}
+		}
+		workdays = temp;;
 	}
 
-	public List<LocalDate> getStandardWorkdays() {
-		return this.standardWorkdays;
+	private void populateStandardWorkdays() {
+
+		LocalDate temp = firstDayOfYear;
+		while (!temp.isAfter(lastDayOfYear)) {
+			DayOfWeek dayOfWeek = temp.getDayOfWeek();
+			if(validWorkdays.contains(dayOfWeek)){				
+				standardWorkdays.add(temp);
+			}
+			temp = temp.plusDays(1);
+		}
+
+	}
+	
+	public List<LocalDate> getWorkdays(){
+		return workdays;
 	}
 
 }
